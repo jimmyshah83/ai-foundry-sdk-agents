@@ -3,11 +3,17 @@ Main class to manage the Foundry Agents.
 """
 import os
 import asyncio
+import logging
 import dotenv
 from azure.ai.projects.aio import AIProjectClient
 from azure.identity.aio import DefaultAzureCredential
 
 dotenv.load_dotenv()
+
+logging.basicConfig(
+    level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+logger = logging.getLogger(__name__)
 
 class Main:
     """Simple main class that prints a greeting."""
@@ -21,11 +27,11 @@ class Main:
             credential=self._credential,
             endpoint=os.getenv("AZURE_AI_PROJECTS_ENDPOINT"),
         )
-        print("Initialized AIProjectClient.")
+        logger.info("Initialized AIProjectClient.")
 
     async def run(self) -> None:
         """Run the main logic."""
-        print("hello world")
+        logger.info("hello world")
 
 def cli() -> None:
     """CLI entry point for the package."""
