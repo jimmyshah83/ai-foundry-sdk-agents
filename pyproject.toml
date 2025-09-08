@@ -24,11 +24,14 @@ classifiers = [
   "Operating System :: OS Independent",
 ]
 dependencies = [
-  "azure-core>=1.30.0",
+  "dotenv",
+  "azure-identity",
+  "azure-ai-projects",
+  "aiohttp", 
 ]
 
 [project.scripts]
-foundry-agents = "foundry_agents.main:main"
+foundry-agents = "foundry_agents.main:cli"
 
 [project.optional-dependencies]
 dev = [
