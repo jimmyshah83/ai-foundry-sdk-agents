@@ -18,12 +18,17 @@ classifiers = [
   "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
   "License :: OSI Approved :: MIT License",
   "Operating System :: OS Independent",
 ]
 dependencies = [
   "azure-core>=1.30.0",
 ]
+
+[project.scripts]
+foundry-agents = "foundry_agents.main:main"
 
 [project.optional-dependencies]
 dev = [
@@ -34,7 +39,7 @@ dev = [
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["azure_ai_projects*"]
+include = ["foundry_agents*"]
 
 [tool.ruff]
 line-length = 100
