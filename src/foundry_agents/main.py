@@ -20,18 +20,35 @@ class Main:
 
     _client: AIProjectClient
     _credential: DefaultAzureCredential
+    _agent: any
 
     def __init__(self) -> None:
         self._credential = DefaultAzureCredential()
         self._client = AIProjectClient(
             credential=self._credential,
-            endpoint=os.getenv("AZURE_AI_PROJECTS_ENDPOINT"),
+            endpoint=os.getenv("AZURE_AI_PROJECTS_ENDPOINT")
         )
-        logger.info("Initialized AIProjectClient.")
+        logger.info("Initialized AIProjectClient %s", self._client)
+
+    async def initialize_agent(self) -> None:
+        """Initialize the agent asynchronously."""
+        self._agent = await self._client.agents.create_agent(
+            model="gpt-4.1-agent",
+            name="TriageAgent",
+            instructions="Please triage the following issue."
+        )
+        logger.info("Agent created with ID %s and name %s", self._agent.id, self._agent.name)
+
+    async def triage_agent(self) -> None:
+        """Simple AI Foundry SDK Triage agent."""
+        logger.info("Triage agent started.")
 
     async def run(self) -> None:
         """Run the main logic."""
-        logger.info("hello world")
+        if not self._agent:
+            await self.initialize_agent()
+        await self.triage_agent()
+
 
 def cli() -> None:
     """CLI entry point for the package."""
