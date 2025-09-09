@@ -5,8 +5,9 @@ import os
 import asyncio
 import logging
 import dotenv
-from azure.ai.projects.aio import AIProjectClient
-from azure.identity.aio import DefaultAzureCredential
+from azure.ai.projects import AIProjectClient
+from azure.identity import DefaultAzureCredential
+from azure.ai.agents.models import Agent
 
 dotenv.load_dotenv()
 
@@ -20,19 +21,9 @@ class Main:
 
     _client: AIProjectClient
     _credential: DefaultAzureCredential
-    _agent: any
-
-    def __init__(self) -> None:
-        self._credential = DefaultAzureCredential()
-        self._client = AIProjectClient(
-            credential=self._credential,
-            endpoint=os.getenv("AZURE_AI_PROJECTS_ENDPOINT")
-        )
-        logger.info("Initialized AIProjectClient %s", self._client)
-
-    async def initialize_agent(self) -> None:
-        """Initialize the Canadian ER triage agent asynchronously."""
-        instructions = """You are a Canadian Emergency Room triage nurse following the Canadian Triage and Acuity Scale (CTAS).
+    _agent: Agent
+    _agent_name: str = "CanadianERTriageAgent"
+    _instructions = """You are a Canadian Emergency Room triage nurse following the Canadian Triage and Acuity Scale (CTAS).
         
         Assess patients using the 5-level CTAS system:
         - Level 1 (Resuscitation): Life-threatening, immediate intervention required
@@ -48,19 +39,35 @@ class Main:
         4. Any red flags requiring immediate attention
         
         Always prioritize patient safety and follow Canadian healthcare protocols."""
-        
-        self._agent = await self._client.agents.create_agent(
-            model="gpt-4.1-agent",
-            name="CanadianERTriageAgent",
-            instructions=instructions
+
+    def __init__(self) -> None:
+        self._credential = DefaultAzureCredential()
+        self._client = AIProjectClient(
+            credential=self._credential,
+            endpoint=os.getenv("AZURE_AI_PROJECTS_ENDPOINT")
         )
-        logger.info("Canadian ER Triage Agent created with ID %s and name %s", self._agent.id, self._agent.name)
+        logger.info("Initialized AIProjectClient %s", self._client)
+
+    async def initialize_agent(self) -> None:
+        """Initialize the Canadian ER triage agent asynchronously."""
+
+        if not self._client.agents.get_agent(agent_id=self._client.agents.get_agent(self._agent_name)):
+            logger.info("Creating new agent with name %s", self._agent_name)
+            self._agent = await self._client.agents.create_agent(
+                model="gpt-4.1-agent",
+                name=self._agent_name,
+                instructions=self._instructions
+            )
+            logger.debug("Canadian ER Triage Agent created with ID %s and name %s", self._agent.id, self._agent.name)
 
     async def triage_patient(self, patient_info: str) -> str:
         """Triage a patient using Canadian ER protocols."""
         logger.info("Starting patient triage assessment.")
 
-        thread = await self._client.agents.threads.create()
+        thread = self._client.agents.threads.create(
+            title="Canadian ER Triage Assessment",
+            user_id="user-id"
+        )
         message = await self._client.agents.messages.create(
             thread_id=thread.id,
             role="user",
@@ -71,7 +78,7 @@ class Main:
         # Run the triage assessment
         run = await self._client.agents.runs.create(
             thread_id=thread.id,
-            assistant_id=self._agent.id
+            assistant_id=self._agent.agent.id
         )
         
         # Wait for completion and get response
@@ -89,10 +96,7 @@ class Main:
 
     async def run(self, patient_info: str = None) -> str:
         """Run the Canadian ER triage assessment."""
-        if not self._agent:
-            await self.initialize_agent()
-        
-        # Use sample patient if none provided
+        await self.initialize_agent()        
         if not patient_info:
             patient_info = ("45-year-old male presenting with chest pain, shortness of breath, "
                           "sweating, and nausea. Onset 30 minutes ago. No known cardiac history. "
@@ -106,11 +110,7 @@ def cli() -> None:
     async def main() -> None:
         triage_agent = Main()
         result = await triage_agent.run()
-        print("\n" + "="*60)
-        print("CANADIAN ER TRIAGE ASSESSMENT")
-        print("="*60)
-        print(result)
-        print("="*60)
+        logger.debug("Triage Result: %s", result)
     
     asyncio.run(main())
 

@@ -27,7 +27,6 @@ dependencies = [
   "dotenv",
   "azure-identity",
   "azure-ai-projects",
-  "aiohttp", 
 ]
 
 [project.scripts]
