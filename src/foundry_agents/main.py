@@ -24,8 +24,10 @@ class Main:
 
     _client: AIProjectClient
     _credential: DefaultAzureCredential
-    _agent: Agent
-    _agent_name: str = "CanadianERTriageAgent"
+    _triage_agent: Agent
+    _triage_agent_name: str = "CanadianERTriageAgent"
+    _patient_history_agent_name: str = "CanadianERPatientHistoryAgent"
+    _patient_history_agent: Agent
     _instructions = """You are a Canadian Emergency Room triage nurse following the Canadian Triage and Acuity Scale (CTAS).
         
         Assess patients using the 5-level CTAS system:
@@ -51,27 +53,6 @@ class Main:
         )
         logger.info("Initialized AIProjectClient %s", self._client)
 
-    def initialize_agent(self) -> None:
-        """Initialize the Canadian ER triage agent asynchronously."""
-
-        existing_agents = self._client.agents.list_agents()
-        existing_agent = None
-        for agent in existing_agents:
-            if agent.name == self._agent_name:
-                existing_agent = agent
-                self._agent = existing_agent
-                logger.info("Found existing agent with name %s and ID %s", self._agent_name, self._agent.id)
-                break
-
-        if not existing_agent:
-            logger.info("Creating new agent with name %s", self._agent_name)
-            self._agent = self._client.agents.create_agent(
-                model="gpt-4.1-agent",
-                name=self._agent_name,
-                instructions=self._instructions
-            )
-            logger.debug("Canadian ER Triage Agent created with ID %s and name %s", self._agent.id, self._agent.name)
-
     def triage_patient(self, patient_info: str) -> None:
         """Triage a patient using Canadian ER protocols."""
         logger.info("Starting patient triage assessment.")
@@ -87,7 +68,7 @@ class Main:
         # Run the triage assessment
         self._client.agents.runs.create_and_process(
             thread_id=thread.id,
-            agent_id=self._agent.id
+            agent_id=self._triage_agent.id
         )
         
         # Get the triage assessment
@@ -100,7 +81,45 @@ class Main:
 
     def run(self, patient_info: str = None) -> str:
         """Run the Canadian ER triage assessment."""
-        self.initialize_agent()        
+
+        existing_agents = self._client.agents.list_agents()
+
+        # Create a triage agent if it doesn't exist
+        existing_triage_agent = None
+        for agent in existing_agents:
+            if agent.name == self._triage_agent_name:
+                existing_triage_agent = agent
+                self._triage_agent = existing_triage_agent
+                logger.info("Found existing agent with name %s and ID %s", self._triage_agent.name, self._triage_agent.id)
+                break
+
+        if not existing_triage_agent:
+            logger.info("Creating new agent with name %s", self._triage_agent_name)
+            self._triage_agent = self._client.agents.create_agent(
+                model="gpt-4.1-agent",
+                name=self._triage_agent_name,
+                instructions=self._instructions
+            )
+            logger.debug("Canadian ER Triage Agent created with ID %s and name %s", self._triage_agent.id, self._triage_agent.name)
+
+        # Create a patient history agent if it does not exist
+        existing_patient_history_agent = None
+        for agent in existing_agents:
+            if agent.name == self._patient_history_agent_name:
+                existing_patient_history_agent = agent
+                self._patient_history_agent = existing_patient_history_agent
+                logger.info("Found existing agent with name %s and ID %s", self._patient_history_agent.name, self._patient_history_agent.id)
+                break
+
+        if not existing_patient_history_agent:
+            logger.info("Creating new agent with name %s", self._patient_history_agent_name)
+            self._patient_history_agent = self._client.agents.create_agent(
+                model="gpt-4.1-agent",
+                name=self._patient_history_agent_name,
+                instructions=self._instructions
+            )
+            logger.debug("Canadian ER Patient History Agent created with ID %s and name %s", self._patient_history_agent.id, self._patient_history_agent.name)
+
         if not patient_info:
             patient_info = ("45-year-old male presenting with chest pain, shortness of breath, "
                           "sweating, and nausea. Onset 30 minutes ago. No known cardiac history. "
