@@ -91,14 +91,12 @@ class Main:
         )
         
         # Get the triage assessment
-        messages = self._client.agents.messages.list(thread_id=thread.id, order=ListSortOrder.ASCENDINGG)
+        messages = self._client.agents.messages.list(thread_id=thread.id, order=ListSortOrder.ASCENDING)
         for msg in messages:
             if msg.text_messages:
                 last_text = msg.text_messages[-1]
                 text = last_text.text.value.replace("\u3010", "[").replace("\u3011", "]")
-                logger.info("Received patient triage message ID %s", text)
-
-        logger.info("Patient triage completed.")
+                logger.info("Received patient triage %s", text)
 
     def run(self, patient_info: str = None) -> str:
         """Run the Canadian ER triage assessment."""
