@@ -8,156 +8,196 @@ from azure.ai.projects import AIProjectClient
 from azure.identity import DefaultAzureCredential
 from azure.ai.projects.models import ConnectionType
 from azure.ai.agents.models import (
-    Agent,
-    MessageRole,
-    ListSortOrder,
-    AzureAISearchTool,
-    AzureAISearchQueryType,
+	Agent,
+	MessageRole,
+	ListSortOrder,
+	AzureAISearchTool,
+	AzureAISearchQueryType,
 )
 
 dotenv.load_dotenv()
 
 logging.basicConfig(
-    level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    )
+	level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+	)
 logger = logging.getLogger(__name__)
 
 class Main:
-    """Canadian Emergency Room Triage Agent using CTAS (Canadian Triage and Acuity Scale)."""
+	"""Canadian Emergency Room Triage Agent using CTAS (Canadian Triage and Acuity Scale)."""
 
-    _client: AIProjectClient
-    _credential: DefaultAzureCredential
-    _triage_agent: Agent
-    _triage_agent_name: str = "CanadianERTriageAgent"
-    _patient_history_agent_name: str = "CanadianERPatientHistoryAgent"
-    _patient_history_agent: Agent
-    _search_idx_name: str = "patient-records-idx"
-    _instructions = """You are a Canadian Emergency Room triage nurse following the Canadian Triage and Acuity Scale (CTAS).
-        
-        Assess patients using the 5-level CTAS system:
-        - Level 1 (Resuscitation): Life-threatening, immediate intervention required
-        - Level 2 (Emergent): Potential threat to life/limb, within 15 minutes
-        - Level 3 (Urgent): Potentially serious, within 30 minutes
-        - Level 4 (Less Urgent): Conditions related to patient age, distress, potential complications, within 60 minutes
-        - Level 5 (Non-urgent): Non-urgent conditions, within 120 minutes
-        
-        For each patient, provide:
-        1. CTAS level (1-5) with rationale
-        2. Recommended immediate actions
-        3. Estimated wait time based on current ER capacity
-        4. Any red flags requiring immediate attention
-        
-        Always prioritize patient safety and follow Canadian healthcare protocols."""
+	_client: AIProjectClient
+	_credential: DefaultAzureCredential
+	_triage_agent: Agent
+	_triage_agent_name: str = "CanadianERTriageAgent"
+	_patient_history_agent_name: str = "CanadianERPatientHistoryAgent"
+	_patient_history_agent: Agent
+	_search_idx_name: str = "patient-records-idx"
+	_triage_instructions = """You are a Canadian Emergency Room triage nurse following the Canadian Triage and Acuity Scale (CTAS).
+	                
+	                Assess patients using the 5-level CTAS system:
+	                - Level 1 (Resuscitation): Life-threatening, immediate intervention required
+	                - Level 2 (Emergent): Potential threat to life/limb, within 15 minutes
+	                - Level 3 (Urgent): Potentially serious, within 30 minutes
+	                - Level 4 (Less Urgent): Conditions related to patient age, distress, potential complications, within 60 minutes
+	                - Level 5 (Non-urgent): Non-urgent conditions, within 120 minutes
 
-    def __init__(self) -> None:
-        self._credential = DefaultAzureCredential()
-        self._client = AIProjectClient(
-            credential=self._credential,
-            endpoint=os.getenv("AZURE_AI_PROJECTS_ENDPOINT")
-        )
-        logger.info("Initialized AIProjectClient %s", self._client)
+	                For each patient, provide a list response:
+	                1. CTAS level (1-5) with rationale
+	                2. Recommended immediate actions
+	                3. Estimated wait time based on current ER capacity
+	                4. Any red flags requiring immediate attention
+	                
+	                Always prioritize patient safety and follow Canadian healthcare protocols."""
 
-    def execute_agent(self, agent: Agent, content: str) -> None:
-        """Triage a patient using Canadian ER protocols."""
-        logger.info("Starting patient triage assessment.")
+	_patient_history_instructions = """You are a Canadian Emergency Room triage nurse using the Canadian Triage and Acuity Scale (CTAS).
 
-        thread = self._client.agents.threads.create()
-        message = self._client.agents.messages.create(
-            thread_id=thread.id,
-            role=MessageRole.USER,
-            content=content,
-        )
-        logger.info("Sent patient info message ID %s", message.content)
-        
-        # Run the triage assessment
-        self._client.agents.runs.create_and_process(
-            thread_id=thread.id,
-            agent_id=agent.id
-        )
-        
-        # Get the triage assessment
-        messages = self._client.agents.messages.list(thread_id=thread.id, order=ListSortOrder.ASCENDING)
-        for msg in messages:
-            if msg.text_messages:
-                last_text = msg.text_messages[-1]
-                text = last_text.text.value.replace("\u3010", "[").replace("\u3011", "]")
-                logger.info("Received patient triage %s", text)
+	Your task is to RETRIEVE and SUMMARIZE the patient's prior medical history using the Azure AI Search tool that is configured for a VECTOR_SEMANTIC_HYBRID query workflow against the patient records index. ALWAYS perform one or more search tool calls before answering. If no documents are returned, state clearly: `No prior history located in indexed patient records.` and still output the JSON schema with empty arrays/nulls.
 
-    def run(self, input: str = None) -> str:
-        """Run the Canadian ER triage assessment."""
+	SEARCH STRATEGY (perform 2–3 queries when possible):
+	1. Full exact name (e.g., "Aaron697 Stanton715").
+	2. Last name + birth year (e.g., "Stanton715 1981").
+	3. Presenting symptom keywords + last name (e.g., "chest pain Stanton715") if symptoms provided.
+	Use concise query text; do NOT include instructions or JSON in the query.
 
-        existing_agents = self._client.agents.list_agents()
+	DATA HANDLING RULES:
+	- Never fabricate or infer information not supported by retrieved documents.
+	- If conflicting data points exist (e.g., two different ages), list both and mark them as a conflict.
+	- Do not assume absence of a condition means the patient is healthy; just leave sections empty.
+	- Preserve Canadian clinical context and spelling.
+	- Do not output PHI beyond what is already provided or retrieved.
 
-        # Create a triage agent if it doesn't exist
-        existing_triage_agent = None
-        for agent in existing_agents:
-            if agent.name == self._triage_agent_name:
-                existing_triage_agent = agent
-                self._triage_agent = existing_triage_agent
-                logger.info("Found existing agent with name %s and ID %s", self._triage_agent.name, self._triage_agent.id)
-                break
+	EXTRACT ONLY WHAT EXISTS in the retrieved content into these sections.
+	OUTPUT MUST BE VALID JSON (first) FOLLOWED BY a concise narrative (<=120 words):
+	{
+	  "patient_name": "<string or null>",
+	  "demographics": "<string summary or empty string>",
+	  "past_medical_history": ["<condition>", ...],
+	  "medications": ["<medication>", ...],
+	  "allergies": ["<allergy>", ...],
+	  "surgical_history": ["<procedure>", ...],
+	  "recent_encounters": [{"description": "<text>", "approx_date": "<ISO or free-text date or null>"}],
+	  "recent_vitals_labs": ["<vital or lab with value>", ...],
+	  "risk_factors": ["<factor>", ...],
+	  "sources": ["<document_id_or_filename>", ...]
+	}
 
-        if not existing_triage_agent:
-            logger.info("Creating new agent with name %s", self._triage_agent_name)
-            self._triage_agent = self._client.agents.create_agent(
-                model="gpt-4.1-agent",
-                name=self._triage_agent_name,
-                instructions=self._instructions
-            )
-            logger.debug("Canadian ER Triage Agent created with ID %s and name %s", self._triage_agent.id, self._triage_agent.name)
+	Narrative after JSON should highlight risk factors relevant to current presentation (e.g., cardiac risks, respiratory compromise, infection risks) and explicitly mention if history is sparse.
 
-        #Define AI search connection
-        search_connection_id = self._client.connections.get_default(ConnectionType.AZURE_AI_SEARCH).id
-        search_tool = AzureAISearchTool(
-            index_connection_id=search_connection_id,
-            index_name=self._search_idx_name,
-            query_type=AzureAISearchQueryType.VECTOR_SEMANTIC_HYBRID,
-            top_k=3,
-        )
+	If a section has no data use an empty array ([]) or null (for patient_name) but DO NOT omit keys.
+	ALWAYS cite every unique document you used in the `sources` array.
+	"""
 
-        # Create a patient history agent if it does not exist
-        existing_patient_history_agent = None
-        for agent in existing_agents:
-            if agent.name == self._patient_history_agent_name:
-                existing_patient_history_agent = agent
-                self._patient_history_agent = existing_patient_history_agent
-                logger.info("Found existing agent with name %s and ID %s", self._patient_history_agent.name, self._patient_history_agent.id)
-                break
+	def __init__(self) -> None:
+		self._credential = DefaultAzureCredential()
+		self._client = AIProjectClient(
+			credential=self._credential,
+			endpoint=os.getenv("AZURE_AI_PROJECTS_ENDPOINT")
+		)
+		logger.info("Initialized AIProjectClient %s", self._client)
 
-        if not existing_patient_history_agent:
-            logger.info("Creating new agent with name %s", self._patient_history_agent_name)
-            self._patient_history_agent = self._client.agents.create_agent(
-                model="gpt-4.1-agent",
-                name=self._patient_history_agent_name,
-                instructions=self._instructions,
-                tools=[search_tool.definitions] if search_tool else None,
-                tool_resources=[search_tool.resources] if search_tool else None,
-            )
-            logger.debug("Canadian ER Patient History Agent created with ID %s and name %s", self._patient_history_agent.id, self._patient_history_agent.name)
+	def execute_agent(self, agent: Agent, content: str) -> None:
+		"""Triage a patient using Canadian ER protocols."""
+		logger.info("Starting patient triage assessment.")
 
-        # Validate triage agent
-        if not input:
-            input = ("Patient info:"
-                            "Name: Aaron697 Stanton715"
-                            "Gender: Male"
-                            "Birth Date: November 6, 1981 (43 years old)"
-                            "Location: Prince Edward Island, Canada"
-                    "Details for visit to ER:"
-                         "Patient is presenting with chest pain, shortness of breath, "
-                          "sweating, and nausea. Onset 30 minutes ago. No known cardiac history. "
-                          "Vital signs: BP 150/90, HR 110, RR 22, O2 sat 96%")
+		thread = self._client.agents.threads.create()
+		message = self._client.agents.messages.create(
+			thread_id=thread.id,
+			role=MessageRole.USER,
+			content=content,
+		)
+		logger.info("Sent patient info message ID %s", message.content)
 
-        # triage_agent_content: str = f"Please assess this patient for Canadian ER triage: {input}"
-        patient_history_agent_content: str = f"Please provide the patient history for: {input}"
-        # self.execute_agent(agent=self._triage_agent, content=triage_agent_content)
-        self.execute_agent(agent=self._patient_history_agent, content=patient_history_agent_content)
+		# Run the triage assessment
+		self._client.agents.runs.create_and_process(
+			thread_id=thread.id,
+			agent_id=agent.id
+		)
+
+		# Get the triage assessment
+		messages = self._client.agents.messages.list(thread_id=thread.id, order=ListSortOrder.ASCENDING)
+		for msg in messages:
+			if msg.text_messages:
+				last_text = msg.text_messages[-1]
+				text = last_text.text.value.replace("\u3010", "[").replace("\u3011", "]")
+				logger.info("Received patient triage %s", text)
+
+	def run(self) -> str:
+		"""Run the Canadian ER triage assessment."""
+
+		existing_agents = self._client.agents.list_agents()
+
+		# Create a triage agent if it doesn't exist
+		existing_triage_agent = None
+		for agent in existing_agents:
+			if agent.name == self._triage_agent_name:
+				existing_triage_agent = agent
+				self._triage_agent = existing_triage_agent
+				logger.info("Found existing agent with name %s and ID %s", self._triage_agent.name, self._triage_agent.id)
+				break
+
+		if not existing_triage_agent:
+			logger.info("Creating new agent with name %s", self._triage_agent_name)
+			self._triage_agent = self._client.agents.create_agent(
+				model="gpt-4.1-agent",
+				name=self._triage_agent_name,
+				instructions=self._triage_instructions
+			)
+			logger.debug("Canadian ER Triage Agent created with ID %s and name %s", self._triage_agent.id, self._triage_agent.name)
+
+		#Define AI search connection
+		search_connection_id = self._client.connections.get_default(ConnectionType.AZURE_AI_SEARCH).id
+		search_tool = AzureAISearchTool(
+			index_connection_id=search_connection_id,
+			index_name=self._search_idx_name,
+			query_type=AzureAISearchQueryType.VECTOR_SEMANTIC_HYBRID,
+			top_k=3,
+		)
+
+		# Create a patient history agent if it does not exist
+		existing_patient_history_agent = None
+		for agent in existing_agents:
+			if agent.name == self._patient_history_agent_name:
+				existing_patient_history_agent = agent
+				self._patient_history_agent = existing_patient_history_agent
+				logger.info("Found existing agent with name %s and ID %s", self._patient_history_agent.name, self._patient_history_agent.id)
+				break
+
+		if not existing_patient_history_agent:
+			logger.info("Creating new agent with name %s", self._patient_history_agent_name)
+			self._patient_history_agent = self._client.agents.create_agent(
+				model="gpt-4.1-agent",
+				name=self._patient_history_agent_name,
+				instructions=self._patient_history_instructions,
+				# Pass definitions directly (they are already a list) and resources as an object
+				# Fixes: AttributeError: 'list' object has no attribute 'file_search'
+				tools=search_tool.definitions if search_tool else None,
+				tool_resources=search_tool.resources if search_tool else None,
+			)
+			logger.debug("Canadian ER Patient History Agent created with ID %s and name %s", self._patient_history_agent.id, self._patient_history_agent.name)
+
+		prompt: str = (
+			"Patient info:\n"
+			"Name: Aaron697 Stanton715\n"
+			"Gender: Male\n"
+			"Birth Date: November 6, 1981 (43 years old)\n"
+			"Location: Prince Edward Island, Canada\n"
+			"Details for visit to ER:\n"
+			"Patient is presenting with chest pain, shortness of breath, sweating, and nausea. "
+			"Onset 30 minutes ago. No known cardiac history.\n"
+			"Vital signs: BP 150/90, HR 110, RR 22, O2 sat 96%\n"
+			)
+
+		# triage_agent_content: str = f"Please assess this patient for Canadian ER triage: {input}"
+		patient_history_agent_content: str = f"Please provide the patient history for below patient details: {prompt}"
+		# self.execute_agent(agent=self._triage_agent, content=triage_agent_content)
+		self.execute_agent(agent=self._patient_history_agent, content=patient_history_agent_content)
 
 def cli() -> None:
-    """CLI entry point for the Canadian ER triage agent."""
-    def main() -> None:
-        Main().run()
+	"""CLI entry point for the Canadian ER triage agent."""
+	def main() -> None:
+		Main().run()
 
-    main()
+	main()
 
 if __name__ == "__main__":
-    cli()
+	cli()
