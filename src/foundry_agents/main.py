@@ -31,7 +31,7 @@ class Main:
 	_triage_agent_name: str = "CanadianERTriageAgent"
 	_patient_history_agent_name: str = "CanadianERPatientHistoryAgent"
 	_patient_history_agent: Agent
-	_search_idx_name: str = "patient-records-idx"
+	_search_idx_name: str = "idx-patient-data"
 	_triage_instructions = """You are a Canadian Emergency Room triage nurse following the Canadian Triage and Acuity Scale (CTAS).
 	                
 	                Assess patients using the 5-level CTAS system:
@@ -49,36 +49,37 @@ class Main:
 	                
 	                Always prioritize patient safety and follow Canadian healthcare protocols."""
 
-	_patient_history_instructions = """You are a Canadian Emergency Room triage nurse using the Canadian Triage and Acuity Scale (CTAS).
+	_patient_history_instructions = """You are a medical records assistant with access to an AI search tool for patient medical records.
 
-	Your task: produce a CORE PATIENT SNAPSHOT by FIRST calling the Azure AI Search tool (VECTOR_SEMANTIC_HYBRID) to retrieve history for the provided patient. 
-	ALWAYS do at least one search call before answering. If nothing is retrieved say exactly: `No prior history located in indexed patient records.` and still output the JSON with empty arrays / nulls.
+                    IMPORTANT: You MUST use the AI search tool for every query and request FULL document content, not just previews.
 
-	MINIMAL SEARCH PATTERN (run 1–2 queries):
-	1. Full name (e.g., "Aaron697 Stanton715").
-	2. If symptoms provided, one focused symptom + last name (e.g., "chest pain Stanton715").
+                    When searching for patient records:
+                    1. ALWAYS use the AI search tool first
+                    2. Use specific search terms like "resourceType:Immunization" or "resourceType:DiagnosticReport"
+                    3. Try patient-specific searches like "Aaron697 Stanton715"
+                    4. Request the COMPLETE document content from search results
+                    5. Parse the full JSON structure to find relevant FHIR resources
 
-	RULES:
-	- Do NOT invent data. Extract only what appears in retrieved documents.
-	- Leave empty arrays when no data; keep all keys.
-	- Cite each unique source document id or filename in sources.
-	- Keep narrative <= 60 words; if sparse, state that clearly.
-	- Prefer most recent info when multiple similar entries; if true conflicts, list both and tag with "(conflict)".
+                    For Immunization records, extract these key fields:
+                    - resourceType: "Immunization"
+                    - vaccineCode.text (vaccine name)
+                    - status (completed/not-done)
+                    - occurrenceDateTime (vaccination date)
+                    - primarySource (data reliability)
 
-	OUTPUT STRICT JSON then a short narrative:
-	{
-	  "patient_name": "<string or null>",
-	  "demographics": "<string>",
-	  "active_conditions": ["<condition>", ...],
-	  "medications": ["<medication>", ...],
-	  "allergies": ["<allergy>", ...],
-	  "recent_encounters": [{"summary": "<text>", "date": "<ISO|text|null>"}],
-	  "recent_vitals_labs": ["<name value unit optional_flag>", ...],
-	  "sources": ["<doc_id>", ...]
-	}
+                    For DiagnosticReport records, extract these key fields:
+                    - resourceType: "DiagnosticReport"
+                    - code.text (report type like "Lipid Panel")
+                    - status (final/preliminary)
+                    - effectiveDateTime (test date)
+                    - result.display (test results)
+                    - issued (report issued date)
 
-	Narrative: brief clinical relevance (risk factors, notable gaps, or explicit lack of data).
-	"""
+                    Search strategy:
+                    - Search for "Immunization" and "DiagnosticReport" resource types
+                    - Search by patient name "Aaron697 Stanton715"
+                    - Request complete document content for parsing
+                    - Extract structured immunization and diagnostic data from the full JSON"""
 
 	def __init__(self) -> None:
 		self._credential = DefaultAzureCredential()
@@ -100,13 +101,11 @@ class Main:
 		)
 		logger.info("Sent patient info message ID %s", message.content)
 
-		# Run the triage assessment
 		self._client.agents.runs.create_and_process(
 			thread_id=thread.id,
 			agent_id=agent.id
 		)
 
-		# Get the triage assessment
 		messages = self._client.agents.messages.list(thread_id=thread.id, order=ListSortOrder.ASCENDING)
 		for msg in messages:
 			if msg.text_messages:
@@ -166,22 +165,36 @@ class Main:
 			)
 			logger.debug("Canadian ER Patient History Agent created with ID %s and name %s", self._patient_history_agent.id, self._patient_history_agent.name)
 
-		patient_context: str = (
-			"CORE PATIENT SNAPSHOT REQUEST\n"
-			"name: Aaron697 Stanton715\n"
-			"sex: male\n"
-			"dob: 1981-11-06\n"
-			"presenting_symptoms: chest pain; shortness of breath; diaphoresis; nausea; onset 30 minutes ago\n"
-			"vitals: BP 150/90; HR 110; RR 22; SpO2 96%\n"
-		)
-
-		# triage_agent_content: str = f"Please assess this patient for Canadian ER triage: {input}"
 		patient_history_agent_content: str = (
-			"Return ONLY the core patient snapshot JSON and brief narrative per instructions. "
-			"Retrieve first, then summarize. If nothing found follow the empty response rules. \n\n" 
-			f"{patient_context}"
-		)
-		# self.execute_agent(agent=self._triage_agent, content=triage_agent_content)
+            "I need you to search for and extract Immunization records and DiagnosticReport information for Aaron697 Stanton715 (DOB: 1981-11-06). "
+            
+            "Step 1: Search for Immunization records using these queries: "
+            "- 'resourceType:Immunization' "
+            "- 'Aaron697 Stanton715' "
+            "- 'Influenza' or 'Td' (expected vaccines) "
+            
+            "Step 2: Search for DiagnosticReport records using these queries: "
+            "- 'resourceType:DiagnosticReport' "
+            "- 'Lipid Panel' (expected diagnostic test) "
+            "- 'Aaron697 Stanton715' "
+            
+            "Step 3: Request FULL DOCUMENT CONTENT and extract: "
+            
+            "For Immunizations: "
+            "- Vaccine name and type "
+            "- Vaccination date "
+            "- Status (completed/not-done) "
+            "- Primary source indicator "
+            
+            "For DiagnosticReports: "
+            "- Report type (e.g., Lipid Panel) "
+            "- Test date and issued date "
+            "- Status (final/preliminary) "
+            "- Test results and components "
+            
+            "Expected findings: Patient should have Influenza and Td vaccines from 2013, plus a Lipid Panel diagnostic report. "
+            "Parse the complete JSON thoroughly and provide structured results."
+        )
 		self.execute_agent(agent=self._patient_history_agent, content=patient_history_agent_content)
 
 def cli() -> None:
