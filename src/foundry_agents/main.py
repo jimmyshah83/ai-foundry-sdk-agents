@@ -6,10 +6,13 @@ import logging
 import dotenv
 from azure.ai.projects import AIProjectClient
 from azure.identity import DefaultAzureCredential
+from azure.ai.projects.models import ConnectionType
 from azure.ai.agents.models import (
     Agent,
     MessageRole,
-    ListSortOrder
+    ListSortOrder,
+    AzureAISearchTool,
+    AzureAISearchQueryType,
 )
 
 dotenv.load_dotenv()
@@ -28,6 +31,7 @@ class Main:
     _triage_agent_name: str = "CanadianERTriageAgent"
     _patient_history_agent_name: str = "CanadianERPatientHistoryAgent"
     _patient_history_agent: Agent
+    _search_idx_name: str = "patient-records-idx"
     _instructions = """You are a Canadian Emergency Room triage nurse following the Canadian Triage and Acuity Scale (CTAS).
         
         Assess patients using the 5-level CTAS system:
@@ -53,7 +57,7 @@ class Main:
         )
         logger.info("Initialized AIProjectClient %s", self._client)
 
-    def triage_patient(self, patient_info: str) -> None:
+    def execute_agent(self, agent: Agent, content: str) -> None:
         """Triage a patient using Canadian ER protocols."""
         logger.info("Starting patient triage assessment.")
 
@@ -61,14 +65,14 @@ class Main:
         message = self._client.agents.messages.create(
             thread_id=thread.id,
             role=MessageRole.USER,
-            content=f"Please assess this patient for Canadian ER triage: {patient_info}"
+            content=content,
         )
         logger.info("Sent patient info message ID %s", message.content)
         
         # Run the triage assessment
         self._client.agents.runs.create_and_process(
             thread_id=thread.id,
-            agent_id=self._triage_agent.id
+            agent_id=agent.id
         )
         
         # Get the triage assessment
@@ -102,6 +106,15 @@ class Main:
             )
             logger.debug("Canadian ER Triage Agent created with ID %s and name %s", self._triage_agent.id, self._triage_agent.name)
 
+        #Define AI search connection
+        search_connection_id = self._client.connections.get_default(ConnectionType.AZURE_AI_SEARCH).id
+        search_tool = AzureAISearchTool(
+            index_connection_id=search_connection_id,
+            index_name=self._search_idx_name,
+            query_type=AzureAISearchQueryType.VECTOR_SEMANTIC_HYBRID,
+            top_k=3,
+        )
+
         # Create a patient history agent if it does not exist
         existing_patient_history_agent = None
         for agent in existing_agents:
@@ -116,17 +129,20 @@ class Main:
             self._patient_history_agent = self._client.agents.create_agent(
                 model="gpt-4.1-agent",
                 name=self._patient_history_agent_name,
-                instructions=self._instructions
+                instructions=self._instructions,
+                tools=[search_tool.definitions] if search_tool else None,
+                tool_resources=[search_tool.resources] if search_tool else None,
             )
             logger.debug("Canadian ER Patient History Agent created with ID %s and name %s", self._patient_history_agent.id, self._patient_history_agent.name)
 
+        # Validate triage agent
         if not patient_info:
             patient_info = ("45-year-old male presenting with chest pain, shortness of breath, "
                           "sweating, and nausea. Onset 30 minutes ago. No known cardiac history. "
                           "Vital signs: BP 150/90, HR 110, RR 22, O2 sat 96%")
 
-        self.triage_patient(patient_info)
-
+        triage_agent_content: str = f"Please assess this patient for Canadian ER triage: {patient_info}"
+        self.execute_agent(agent=self._triage_agent, content=triage_agent_content)
 
 def cli() -> None:
     """CLI entry point for the Canadian ER triage agent."""
