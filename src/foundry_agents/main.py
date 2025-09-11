@@ -83,7 +83,7 @@ class Main:
                 text = last_text.text.value.replace("\u3010", "[").replace("\u3011", "]")
                 logger.info("Received patient triage %s", text)
 
-    def run(self, patient_info: str = None) -> str:
+    def run(self, input: str = None) -> str:
         """Run the Canadian ER triage assessment."""
 
         existing_agents = self._client.agents.list_agents()
@@ -136,13 +136,21 @@ class Main:
             logger.debug("Canadian ER Patient History Agent created with ID %s and name %s", self._patient_history_agent.id, self._patient_history_agent.name)
 
         # Validate triage agent
-        if not patient_info:
-            patient_info = ("45-year-old male presenting with chest pain, shortness of breath, "
+        if not input:
+            input = ("Patient info:"
+                            "Name: Aaron697 Stanton715"
+                            "Gender: Male"
+                            "Birth Date: November 6, 1981 (43 years old)"
+                            "Location: Prince Edward Island, Canada"
+                    "Details for visit to ER:"
+                         "Patient is presenting with chest pain, shortness of breath, "
                           "sweating, and nausea. Onset 30 minutes ago. No known cardiac history. "
                           "Vital signs: BP 150/90, HR 110, RR 22, O2 sat 96%")
 
-        triage_agent_content: str = f"Please assess this patient for Canadian ER triage: {patient_info}"
-        self.execute_agent(agent=self._triage_agent, content=triage_agent_content)
+        # triage_agent_content: str = f"Please assess this patient for Canadian ER triage: {input}"
+        patient_history_agent_content: str = f"Please provide the patient history for: {input}"
+        # self.execute_agent(agent=self._triage_agent, content=triage_agent_content)
+        self.execute_agent(agent=self._patient_history_agent, content=patient_history_agent_content)
 
 def cli() -> None:
     """CLI entry point for the Canadian ER triage agent."""
