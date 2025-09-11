@@ -51,40 +51,33 @@ class Main:
 
 	_patient_history_instructions = """You are a Canadian Emergency Room triage nurse using the Canadian Triage and Acuity Scale (CTAS).
 
-	Your task is to RETRIEVE and SUMMARIZE the patient's prior medical history using the Azure AI Search tool that is configured for a VECTOR_SEMANTIC_HYBRID query workflow against the patient records index. ALWAYS perform one or more search tool calls before answering. If no documents are returned, state clearly: `No prior history located in indexed patient records.` and still output the JSON schema with empty arrays/nulls.
+	Your task: produce a CORE PATIENT SNAPSHOT by FIRST calling the Azure AI Search tool (VECTOR_SEMANTIC_HYBRID) to retrieve history for the provided patient. 
+	ALWAYS do at least one search call before answering. If nothing is retrieved say exactly: `No prior history located in indexed patient records.` and still output the JSON with empty arrays / nulls.
 
-	SEARCH STRATEGY (perform 2–3 queries when possible):
-	1. Full exact name (e.g., "Aaron697 Stanton715").
-	2. Last name + birth year (e.g., "Stanton715 1981").
-	3. Presenting symptom keywords + last name (e.g., "chest pain Stanton715") if symptoms provided.
-	Use concise query text; do NOT include instructions or JSON in the query.
+	MINIMAL SEARCH PATTERN (run 1–2 queries):
+	1. Full name (e.g., "Aaron697 Stanton715").
+	2. If symptoms provided, one focused symptom + last name (e.g., "chest pain Stanton715").
 
-	DATA HANDLING RULES:
-	- Never fabricate or infer information not supported by retrieved documents.
-	- If conflicting data points exist (e.g., two different ages), list both and mark them as a conflict.
-	- Do not assume absence of a condition means the patient is healthy; just leave sections empty.
-	- Preserve Canadian clinical context and spelling.
-	- Do not output PHI beyond what is already provided or retrieved.
+	RULES:
+	- Do NOT invent data. Extract only what appears in retrieved documents.
+	- Leave empty arrays when no data; keep all keys.
+	- Cite each unique source document id or filename in sources.
+	- Keep narrative <= 60 words; if sparse, state that clearly.
+	- Prefer most recent info when multiple similar entries; if true conflicts, list both and tag with "(conflict)".
 
-	EXTRACT ONLY WHAT EXISTS in the retrieved content into these sections.
-	OUTPUT MUST BE VALID JSON (first) FOLLOWED BY a concise narrative (<=120 words):
+	OUTPUT STRICT JSON then a short narrative:
 	{
 	  "patient_name": "<string or null>",
-	  "demographics": "<string summary or empty string>",
-	  "past_medical_history": ["<condition>", ...],
+	  "demographics": "<string>",
+	  "active_conditions": ["<condition>", ...],
 	  "medications": ["<medication>", ...],
 	  "allergies": ["<allergy>", ...],
-	  "surgical_history": ["<procedure>", ...],
-	  "recent_encounters": [{"description": "<text>", "approx_date": "<ISO or free-text date or null>"}],
-	  "recent_vitals_labs": ["<vital or lab with value>", ...],
-	  "risk_factors": ["<factor>", ...],
-	  "sources": ["<document_id_or_filename>", ...]
+	  "recent_encounters": [{"summary": "<text>", "date": "<ISO|text|null>"}],
+	  "recent_vitals_labs": ["<name value unit optional_flag>", ...],
+	  "sources": ["<doc_id>", ...]
 	}
 
-	Narrative after JSON should highlight risk factors relevant to current presentation (e.g., cardiac risks, respiratory compromise, infection risks) and explicitly mention if history is sparse.
-
-	If a section has no data use an empty array ([]) or null (for patient_name) but DO NOT omit keys.
-	ALWAYS cite every unique document you used in the `sources` array.
+	Narrative: brief clinical relevance (risk factors, notable gaps, or explicit lack of data).
 	"""
 
 	def __init__(self) -> None:
@@ -168,27 +161,26 @@ class Main:
 				model="gpt-4.1-agent",
 				name=self._patient_history_agent_name,
 				instructions=self._patient_history_instructions,
-				# Pass definitions directly (they are already a list) and resources as an object
-				# Fixes: AttributeError: 'list' object has no attribute 'file_search'
 				tools=search_tool.definitions if search_tool else None,
 				tool_resources=search_tool.resources if search_tool else None,
 			)
 			logger.debug("Canadian ER Patient History Agent created with ID %s and name %s", self._patient_history_agent.id, self._patient_history_agent.name)
 
-		prompt: str = (
-			"Patient info:\n"
-			"Name: Aaron697 Stanton715\n"
-			"Gender: Male\n"
-			"Birth Date: November 6, 1981 (43 years old)\n"
-			"Location: Prince Edward Island, Canada\n"
-			"Details for visit to ER:\n"
-			"Patient is presenting with chest pain, shortness of breath, sweating, and nausea. "
-			"Onset 30 minutes ago. No known cardiac history.\n"
-			"Vital signs: BP 150/90, HR 110, RR 22, O2 sat 96%\n"
-			)
+		patient_context: str = (
+			"CORE PATIENT SNAPSHOT REQUEST\n"
+			"name: Aaron697 Stanton715\n"
+			"sex: male\n"
+			"dob: 1981-11-06\n"
+			"presenting_symptoms: chest pain; shortness of breath; diaphoresis; nausea; onset 30 minutes ago\n"
+			"vitals: BP 150/90; HR 110; RR 22; SpO2 96%\n"
+		)
 
 		# triage_agent_content: str = f"Please assess this patient for Canadian ER triage: {input}"
-		patient_history_agent_content: str = f"Please provide the patient history for below patient details: {prompt}"
+		patient_history_agent_content: str = (
+			"Return ONLY the core patient snapshot JSON and brief narrative per instructions. "
+			"Retrieve first, then summarize. If nothing found follow the empty response rules. \n\n" 
+			f"{patient_context}"
+		)
 		# self.execute_agent(agent=self._triage_agent, content=triage_agent_content)
 		self.execute_agent(agent=self._patient_history_agent, content=patient_history_agent_content)
 
