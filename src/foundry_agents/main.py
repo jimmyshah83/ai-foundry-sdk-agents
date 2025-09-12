@@ -116,21 +116,18 @@ class Main:
 	def run(self) -> str:
 		"""Run the Canadian ER triage assessment."""
 
-		existing_agents = self._client.agents.list_agents()
-
-		# Create a triage agent if it doesn't exist
-		existing_triage_agent = None
-		for agent in existing_agents:
-			if agent.name == self._triage_agent_name:
-				existing_triage_agent = agent
-				self._triage_agent = existing_triage_agent
-				logger.info("Found existing agent with name %s and ID %s", self._triage_agent.name, self._triage_agent.id)
-				break
-
-		if not existing_triage_agent:
+		existing_agents = list(self._client.agents.list_agents())
+		logger.info("Found %d existing agents: %s", len(existing_agents), [agent.name for agent in existing_agents])
+		self._triage_agent = next(
+			agent for agent in existing_agents if agent.name == self._triage_agent_name
+		)
+		if self._triage_agent:
+			logger.info("Found existing agent with name %s and ID %s", self._triage_agent.name, self._triage_agent.id)
+		else:
 			logger.info("Creating new agent with name %s", self._triage_agent_name)
 			self._triage_agent = self._client.agents.create_agent(
 				model="gpt-4.1-agent",
+				description="Agent to perform Canadian ER triage assessments using CTAS",
 				name=self._triage_agent_name,
 				instructions=self._triage_instructions
 			)
@@ -145,21 +142,18 @@ class Main:
 			top_k=3,
 		)
 
-		# Create a patient history agent if it does not exist
-		existing_patient_history_agent = None
-		for agent in existing_agents:
-			if agent.name == self._patient_history_agent_name:
-				existing_patient_history_agent = agent
-				self._patient_history_agent = existing_patient_history_agent
-				logger.info("Found existing agent with name %s and ID %s", self._patient_history_agent.name, self._patient_history_agent.id)
-				break
-
-		if not existing_patient_history_agent:
+		self._patient_history_agent = next(
+			agent for agent in existing_agents if agent.name == self._patient_history_agent_name
+		)
+		if (self._patient_history_agent):
+			logger.info("Found existing agent with name %s and ID %s", self._patient_history_agent.name, self._patient_history_agent.id)
+		else:
 			logger.info("Creating new agent with name %s", self._patient_history_agent_name)
 			self._patient_history_agent = self._client.agents.create_agent(
 				model="gpt-4.1-agent",
 				name=self._patient_history_agent_name,
 				instructions=self._patient_history_instructions,
+				description="Agent to retrieve patient Immunization and DiagnosticReport history using AI search tool",
 				tools=search_tool.definitions if search_tool else None,
 				tool_resources=search_tool.resources if search_tool else None,
 			)
