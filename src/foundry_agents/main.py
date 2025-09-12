@@ -171,11 +171,9 @@ class Main:
             "Step 1: Search for Immunization records using these queries: "
             "- 'resourceType:Immunization' "
             "- 'Aaron697 Stanton715' "
-            "- 'Influenza' or 'Td' (expected vaccines) "
             
             "Step 2: Search for DiagnosticReport records using these queries: "
             "- 'resourceType:DiagnosticReport' "
-            "- 'Lipid Panel' (expected diagnostic test) "
             "- 'Aaron697 Stanton715' "
             
             "Step 3: Request FULL DOCUMENT CONTENT and extract: "
@@ -192,7 +190,6 @@ class Main:
             "- Status (final/preliminary) "
             "- Test results and components "
             
-            "Expected findings: Patient should have Influenza and Td vaccines from 2013, plus a Lipid Panel diagnostic report. "
             "Parse the complete JSON thoroughly and provide structured results."
         )
 		self.execute_agent(agent=self._patient_history_agent, content=patient_history_agent_content)
