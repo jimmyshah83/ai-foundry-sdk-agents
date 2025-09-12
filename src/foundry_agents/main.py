@@ -113,6 +113,16 @@ class Main:
 				text = last_text.text.value.replace("\u3010", "[").replace("\u3011", "]")
 				logger.info("Received patient triage %s", text)
 
+	def get_search_tool(self) -> AzureAISearchTool:
+		"""Get the Azure AI search tool for querying patient records."""
+		search_connection_id = self._client.connections.get_default(ConnectionType.AZURE_AI_SEARCH).id
+		return AzureAISearchTool(
+			index_connection_id=search_connection_id,
+			index_name=self._search_idx_name,
+			query_type=AzureAISearchQueryType.VECTOR_SEMANTIC_HYBRID,
+			top_k=3,
+		)
+
 	def run(self) -> str:
 		"""Run the Canadian ER triage assessment."""
 
@@ -133,14 +143,7 @@ class Main:
 			)
 			logger.debug("Canadian ER Triage Agent created with ID %s and name %s", self._triage_agent.id, self._triage_agent.name)
 
-		#Define AI search connection
-		search_connection_id = self._client.connections.get_default(ConnectionType.AZURE_AI_SEARCH).id
-		search_tool = AzureAISearchTool(
-			index_connection_id=search_connection_id,
-			index_name=self._search_idx_name,
-			query_type=AzureAISearchQueryType.VECTOR_SEMANTIC_HYBRID,
-			top_k=3,
-		)
+		search_tool = self.get_search_tool()
 
 		self._patient_history_agent = next(
 			agent for agent in existing_agents if agent.name == self._patient_history_agent_name
