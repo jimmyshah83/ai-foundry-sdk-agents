@@ -36,7 +36,7 @@ class Main:
 	_search_tool: AzureAISearchTool
 	_conversation_agent_name: str = "CanadianERConversationAgent"
 	_triage_agent_name: str = "CanadianERTriageAgent"
-	_patient_history_agent_name: str = "CanadianERPatientHistoryAgent"	
+	_patient_history_agent_name: str = "CanadianERPatientHistoryAgent" 
 	_search_idx_name: str = "idx-patient-data"
 
 	@property
@@ -120,7 +120,7 @@ class Main:
 			query_type=AzureAISearchQueryType.VECTOR_SEMANTIC_HYBRID,
 			top_k=3,
 		)
-		
+
 	def initialize_triage_agent(self, existing_agents: list) -> None:
 		"""Initialize The triage agent"""
 		logger.info("Found %d existing agents: %s", len(existing_agents), [agent.name for agent in existing_agents])
@@ -173,7 +173,7 @@ class Main:
 			patient_history_connected_agent = ConnectedAgentTool(
 				id=self._patient_history_agent.id, name=self._patient_history_agent.name, description="Retrieve patient history"
 			)
-			
+
 			self._conversation_agent = self._client.agents.create_agent(
 				model="gpt-4.1-agent",
 				description="Main conversation agent for Canadian ER triage",
