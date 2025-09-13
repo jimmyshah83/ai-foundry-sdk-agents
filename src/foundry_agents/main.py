@@ -15,8 +15,13 @@ from azure.ai.agents.models import (
 	ListSortOrder,
 	AzureAISearchTool,
 	AzureAISearchQueryType,
-	ConnectedAgentTool,
-	
+	ConnectedAgentTool
+)
+from azure.ai.projects.models import (
+	EvaluatorIds,
+	EvaluatorConfiguration,
+	Evaluation,
+	InputDataset
 )
 
 dotenv.load_dotenv()
@@ -194,6 +199,67 @@ class Main:
 			version="1.0",
 			file_path=Path(__file__).parent / "config" / "evaluation_data.jsonl"
 		)
+		evaluators = {
+			"relevance": EvaluatorConfiguration(
+				id=EvaluatorIds.RELEVANCE.value,
+				init_params={
+					"deployment_name": "gpt-5",
+				},
+				data_mapping={
+					"query": "input",
+					"response": "expected_output"
+				}
+            ),
+			"coherence": EvaluatorConfiguration(
+				id=EvaluatorIds.COHERENCE.value,
+				init_params={
+					"deployment_name": "gpt-5",
+				},
+				data_mapping={
+					"query": "input",
+					"response": "expected_output"
+				}
+            ),
+			"fluency": EvaluatorConfiguration(
+				id=EvaluatorIds.FLUENCY.value,
+				init_params={
+					"deployment_name": "gpt-5",
+				},
+				data_mapping={
+					"query": "input",
+					"response": "expected_output"
+				}
+            ),
+			"similarity": EvaluatorConfiguration(
+				id=EvaluatorIds.SIMILARITY.value,
+				init_params={
+					"deployment_name": "gpt-5",
+				},
+				data_mapping={
+					"query": "input",
+					"response": "expected_output",
+					"ground_truth": "expected_output"
+				}
+            )
+		}
+		
+		evaluation = Evaluation(
+			display_name="Canadian ER Triage Assessment",
+			description="Evaluation for Canadian ER Triage Agent using CTAS",
+			data=InputDataset(id=data_id),
+			evaluators=evaluators
+		)
+
+		evaluation_response = self._client.evaluations.create(
+			evaluation,
+			headers={
+				"model-endpoint": "gpt-5",
+				"api-key": "your-api-key"
+			}
+		)
+
+		logger.info("Created evaluation with Name: %s", evaluation_response.name)
+		logger.info("Evaluation Status: %s", evaluation_response.status)
 
 	def run(self) -> str:
 		"""Run the Canadian ER triage assessment."""
