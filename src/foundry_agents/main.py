@@ -189,14 +189,16 @@ class Main:
 		"""Run the Canadian ER triage assessment."""
 
 		existing_agents = list(self._client.agents.list_agents())
-		
-		self.initialize_triage_agent(existing_agents)		
+
+		self.initialize_conversation_agent(existing_agents)
+
+		self.initialize_triage_agent(existing_agents)
 
 		self.initialize_search_tool()
 
 		self.initialize_patient_history_agent(existing_agents)
 
-		self.execute_agent(agent=self._patient_history_agent, content=self._user_prompt)
+		self.execute_agent(agent=self._conversation_agent, content=self._user_prompt)
 
 def cli() -> None:
 	"""CLI entry point for the Canadian ER triage agent."""
