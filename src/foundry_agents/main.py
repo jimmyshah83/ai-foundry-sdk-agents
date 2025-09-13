@@ -173,14 +173,15 @@ class Main:
 			patient_history_connected_agent = ConnectedAgentTool(
 				id=self._patient_history_agent.id, name=self._patient_history_agent.name, description="Retrieve patient history"
 			)
+			
 			self._conversation_agent = self._client.agents.create_agent(
 				model="gpt-4.1-agent",
 				description="Main conversation agent for Canadian ER triage",
 				name=self._conversation_agent_name,
 				instructions=self._conversation_instructions,
 				tools=[
-					triage_connected_agent,
-					patient_history_connected_agent
+					triage_connected_agent.definitions[0],
+					patient_history_connected_agent.definitions[0]
 				]
 			)
 			logger.debug("Canadian ER Conversation Agent created with ID %s and name %s", self._conversation_agent.id, self._conversation_agent.name)
@@ -190,13 +191,15 @@ class Main:
 
 		existing_agents = list(self._client.agents.list_agents())
 
-		self.initialize_conversation_agent(existing_agents)
-
-		self.initialize_triage_agent(existing_agents)
-
+		# Initialize search tool first as it's needed by patient history agent
 		self.initialize_search_tool()
 
+		# Initialize specialized agents first before conversation agent
+		self.initialize_triage_agent(existing_agents)
 		self.initialize_patient_history_agent(existing_agents)
+
+		# Initialize conversation agent last as it needs references to other agents
+		self.initialize_conversation_agent(existing_agents)
 
 		self.execute_agent(agent=self._conversation_agent, content=self._user_prompt)
 

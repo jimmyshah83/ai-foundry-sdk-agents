@@ -1,25 +1,19 @@
-I need you to search for and extract Immunization records and DiagnosticReport information for Aaron697 Stanton715 (DOB: 1981-11-06).
+Patient Triage Request:
 
-Step 1: Search for Immunization records using these queries:
-- 'resourceType:Immunization'
-- 'Aaron697 Stanton715'
+Patient: Aaron697 Stanton715 (DOB: 1981-11-06)
 
-Step 2: Search for DiagnosticReport records using these queries:
-- 'resourceType:DiagnosticReport'
-- 'Aaron697 Stanton715'
+Chief Complaint: The patient presents to the emergency department with chest pain that started 2 hours ago. The pain is described as sharp, radiating to the left arm, and is accompanied by shortness of breath and nausea. The patient appears anxious and is sweating profusely.
 
-Step 3: Request FULL DOCUMENT CONTENT and extract:
+Current Symptoms:
+- Chest pain (sharp, left arm radiation)
+- Shortness of breath
+- Nausea
+- Diaphoresis (sweating)
+- Anxiety
+- Onset: 2 hours ago
+- Pain level: 8/10
 
-For Immunizations:
-- Vaccine name and type
-- Vaccination date
-- Status (completed/not-done)
-- Primary source indicator
-
-For DiagnosticReports:
-- Report type (e.g., Lipid Panel)
-- Test date and issued date
-- Status (final/preliminary)
-- Test results and components
-
-Parse the complete JSON thoroughly and provide structured results.
+Please coordinate the triage assessment by:
+1. First retrieving the patient's medical history, immunizations, and diagnostic reports
+2. Then performing a CTAS triage assessment based on the current presentation and historical data
+3. Provide a comprehensive triage decision with rationale
