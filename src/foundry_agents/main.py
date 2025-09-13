@@ -46,37 +46,25 @@ class Main:
 			config_file = Path(__file__).parent / 'config' / 'triage_instructions.txt'
 			return config_file.read_text()
 
-	_patient_history_instructions = """You are a medical records assistant with access to an AI search tool for patient medical records.
+	@property
+	def _patient_history_instructions(self) -> str:
+		"""Load patient history instructions from config file."""
+		try:
+			with resources.files('foundry_agents.config').joinpath('patient_history_instructions.txt').open('r') as f:
+				return f.read()
+		except FileNotFoundError:
+			config_file = Path(__file__).parent / 'config' / 'patient_history_instructions.txt'
+			return config_file.read_text()
 
-                    IMPORTANT: You MUST use the AI search tool for every query and request FULL document content, not just previews.
-
-                    When searching for patient records:
-                    1. ALWAYS use the AI search tool first
-                    2. Use specific search terms like "resourceType:Immunization" or "resourceType:DiagnosticReport"
-                    3. Try patient-specific searches like "Aaron697 Stanton715"
-                    4. Request the COMPLETE document content from search results
-                    5. Parse the full JSON structure to find relevant FHIR resources
-
-                    For Immunization records, extract these key fields:
-                    - resourceType: "Immunization"
-                    - vaccineCode.text (vaccine name)
-                    - status (completed/not-done)
-                    - occurrenceDateTime (vaccination date)
-                    - primarySource (data reliability)
-
-                    For DiagnosticReport records, extract these key fields:
-                    - resourceType: "DiagnosticReport"
-                    - code.text (report type like "Lipid Panel")
-                    - status (final/preliminary)
-                    - effectiveDateTime (test date)
-                    - result.display (test results)
-                    - issued (report issued date)
-
-                    Search strategy:
-                    - Search for "Immunization" and "DiagnosticReport" resource types
-                    - Search by patient name "Aaron697 Stanton715"
-                    - Request complete document content for parsing
-                    - Extract structured immunization and diagnostic data from the full JSON"""
+	@property
+	def _patient_history_content(self) -> str:
+		"""Load patient history content from config file."""
+		try:
+			with resources.files('foundry_agents.config').joinpath('user_prompt.txt').open('r') as f:
+				return f.read()
+		except FileNotFoundError:
+			config_file = Path(__file__).parent / 'config' / 'user_prompt.txt'
+			return config_file.read_text()
 
 	def __init__(self) -> None:
 		self._credential = DefaultAzureCredential()
@@ -168,34 +156,7 @@ class Main:
 
 		self.initialize_patient_history_agent(existing_agents)
 
-		patient_history_agent_content: str = (
-            "I need you to search for and extract Immunization records and DiagnosticReport information for Aaron697 Stanton715 (DOB: 1981-11-06). "
-            
-            "Step 1: Search for Immunization records using these queries: "
-            "- 'resourceType:Immunization' "
-            "- 'Aaron697 Stanton715' "
-            
-            "Step 2: Search for DiagnosticReport records using these queries: "
-            "- 'resourceType:DiagnosticReport' "
-            "- 'Aaron697 Stanton715' "
-            
-            "Step 3: Request FULL DOCUMENT CONTENT and extract: "
-            
-            "For Immunizations: "
-            "- Vaccine name and type "
-            "- Vaccination date "
-            "- Status (completed/not-done) "
-            "- Primary source indicator "
-            
-            "For DiagnosticReports: "
-            "- Report type (e.g., Lipid Panel) "
-            "- Test date and issued date "
-            "- Status (final/preliminary) "
-            "- Test results and components "
-            
-            "Parse the complete JSON thoroughly and provide structured results."
-        )
-		self.execute_agent(agent=self._patient_history_agent, content=patient_history_agent_content)
+		self.execute_agent(agent=self._patient_history_agent, content=self._patient_history_content)
 
 def cli() -> None:
 	"""CLI entry point for the Canadian ER triage agent."""

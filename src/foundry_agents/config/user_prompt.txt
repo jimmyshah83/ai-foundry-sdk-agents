@@ -1,0 +1,25 @@
+I need you to search for and extract Immunization records and DiagnosticReport information for Aaron697 Stanton715 (DOB: 1981-11-06).
+
+Step 1: Search for Immunization records using these queries:
+- 'resourceType:Immunization'
+- 'Aaron697 Stanton715'
+
+Step 2: Search for DiagnosticReport records using these queries:
+- 'resourceType:DiagnosticReport'
+- 'Aaron697 Stanton715'
+
+Step 3: Request FULL DOCUMENT CONTENT and extract:
+
+For Immunizations:
+- Vaccine name and type
+- Vaccination date
+- Status (completed/not-done)
+- Primary source indicator
+
+For DiagnosticReports:
+- Report type (e.g., Lipid Panel)
+- Test date and issued date
+- Status (final/preliminary)
+- Test results and components
+
+Parse the complete JSON thoroughly and provide structured results.
