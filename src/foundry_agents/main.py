@@ -15,6 +15,7 @@ from azure.ai.agents.models import (
 	ListSortOrder,
 	AzureAISearchTool,
 	AzureAISearchQueryType,
+	ConnectedAgentTool,
 )
 
 dotenv.load_dotenv()
@@ -57,7 +58,7 @@ class Main:
 			return config_file.read_text()
 
 	@property
-	def _patient_history_content(self) -> str:
+	def _user_prompt(self) -> str:
 		"""Load patient history content from config file."""
 		try:
 			with resources.files('foundry_agents.config').joinpath('user_prompt.txt').open('r') as f:
@@ -145,18 +146,29 @@ class Main:
 			)
 			logger.debug("Canadian ER Patient History Agent created with ID %s and name %s", self._patient_history_agent.id, self._patient_history_agent.name)
 
+	def initialize_conversation_agent(self, existing_agents: list) -> None:
+		"""Main conversation agent that takes in user prompt"""
+		print("Initializing conversation agent...")
+
 	def run(self) -> str:
 		"""Run the Canadian ER triage assessment."""
 
 		existing_agents = list(self._client.agents.list_agents())
 		
-		self.initialize_triage_agent(existing_agents)
+		self.initialize_triage_agent(existing_agents)		
 
 		self.initialize_search_tool()
 
 		self.initialize_patient_history_agent(existing_agents)
 
-		self.execute_agent(agent=self._patient_history_agent, content=self._patient_history_content)
+		triage_connected_agent = ConnectedAgentTool(
+			id=self._triage_agent.id, name=self._triage_agent.name, description="Triage the patient based on CTAS"
+		)
+		patient_history_connected_agent = ConnectedAgentTool(
+			id=self._patient_history_agent.id, name=self._patient_history_agent.name, description="Retrieve patient history"
+		)
+
+		self.execute_agent(agent=self._patient_history_agent, content=self._user_prompt)
 
 def cli() -> None:
 	"""CLI entry point for the Canadian ER triage agent."""
