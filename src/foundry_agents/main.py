@@ -30,11 +30,13 @@ class Main:
 
 	_client: AIProjectClient
 	_credential: DefaultAzureCredential
+	_conversation_agent: Agent
 	_triage_agent: Agent
-	_search_tool: AzureAISearchTool
-	_triage_agent_name: str = "CanadianERTriageAgent"
-	_patient_history_agent_name: str = "CanadianERPatientHistoryAgent"
 	_patient_history_agent: Agent
+	_search_tool: AzureAISearchTool
+	_conversation_agent_name: str = "CanadianERConversationAgent"
+	_triage_agent_name: str = "CanadianERTriageAgent"
+	_patient_history_agent_name: str = "CanadianERPatientHistoryAgent"	
 	_search_idx_name: str = "idx-patient-data"
 
 	@property
@@ -55,6 +57,16 @@ class Main:
 				return f.read()
 		except FileNotFoundError:
 			config_file = Path(__file__).parent / 'config' / 'patient_history_instructions.txt'
+			return config_file.read_text()
+
+	@property
+	def _conversation_instructions(self) -> str:
+		"""Load conversation instructions from config file."""
+		try:
+			with resources.files('foundry_agents.config').joinpath('conversation_instructions.txt').open('r') as f:
+				return f.read()
+		except FileNotFoundError:
+			config_file = Path(__file__).parent / 'config' / 'conversation_instructions.txt'
 			return config_file.read_text()
 
 	@property
@@ -148,7 +160,30 @@ class Main:
 
 	def initialize_conversation_agent(self, existing_agents: list) -> None:
 		"""Main conversation agent that takes in user prompt"""
-		print("Initializing conversation agent...")
+		self._conversation_agent = next(
+			(agent for agent in existing_agents if agent.name == self._conversation_agent_name), None
+		)
+		if self._conversation_agent:
+			logger.info("Found existing conversation agent with name %s and ID %s", self._conversation_agent.name, self._conversation_agent.id)
+		else:
+			logger.info("Creating new agent with name %s", self._conversation_agent_name)
+			triage_connected_agent = ConnectedAgentTool(
+				id=self._triage_agent.id, name=self._triage_agent.name, description="Triage the patient based on CTAS"
+			)
+			patient_history_connected_agent = ConnectedAgentTool(
+				id=self._patient_history_agent.id, name=self._patient_history_agent.name, description="Retrieve patient history"
+			)
+			self._conversation_agent = self._client.agents.create_agent(
+				model="gpt-4.1-agent",
+				description="Main conversation agent for Canadian ER triage",
+				name=self._conversation_agent_name,
+				instructions=self._conversation_instructions,
+				tools=[
+					triage_connected_agent,
+					patient_history_connected_agent
+				]
+			)
+			logger.debug("Canadian ER Conversation Agent created with ID %s and name %s", self._conversation_agent.id, self._conversation_agent.name)
 
 	def run(self) -> str:
 		"""Run the Canadian ER triage assessment."""
@@ -160,13 +195,6 @@ class Main:
 		self.initialize_search_tool()
 
 		self.initialize_patient_history_agent(existing_agents)
-
-		triage_connected_agent = ConnectedAgentTool(
-			id=self._triage_agent.id, name=self._triage_agent.name, description="Triage the patient based on CTAS"
-		)
-		patient_history_connected_agent = ConnectedAgentTool(
-			id=self._patient_history_agent.id, name=self._patient_history_agent.name, description="Retrieve patient history"
-		)
 
 		self.execute_agent(agent=self._patient_history_agent, content=self._user_prompt)
 
