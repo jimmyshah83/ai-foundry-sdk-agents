@@ -16,6 +16,7 @@ from azure.ai.agents.models import (
 	AzureAISearchTool,
 	AzureAISearchQueryType,
 	ConnectedAgentTool,
+	
 )
 
 dotenv.load_dotenv()
@@ -185,6 +186,14 @@ class Main:
 				]
 			)
 			logger.debug("Canadian ER Conversation Agent created with ID %s and name %s", self._conversation_agent.id, self._conversation_agent.name)
+
+	def run_evaluation(self) -> None:
+		"""Run the evaluation for the Canadian ER triage assessment."""
+		data_id = self._client.datasets.upload_file(
+			name="Canadian_ER_Triage_Assessment",
+			version="1.0",
+			file_path=Path(__file__).parent / "config" / "evaluation_data.jsonl"
+		)
 
 	def run(self) -> str:
 		"""Run the Canadian ER triage assessment."""
