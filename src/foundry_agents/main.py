@@ -28,6 +28,7 @@ class Main:
 	_client: AIProjectClient
 	_credential: DefaultAzureCredential
 	_triage_agent: Agent
+	_search_tool: AzureAISearchTool
 	_triage_agent_name: str = "CanadianERTriageAgent"
 	_patient_history_agent_name: str = "CanadianERPatientHistoryAgent"
 	_patient_history_agent: Agent
@@ -113,20 +114,18 @@ class Main:
 				text = last_text.text.value.replace("\u3010", "[").replace("\u3011", "]")
 				logger.info("Received patient triage %s", text)
 
-	def get_search_tool(self) -> AzureAISearchTool:
+	def initialize_search_tool(self) -> AzureAISearchTool:
 		"""Get the Azure AI search tool for querying patient records."""
 		search_connection_id = self._client.connections.get_default(ConnectionType.AZURE_AI_SEARCH).id
-		return AzureAISearchTool(
+		self._search_tool = AzureAISearchTool(
 			index_connection_id=search_connection_id,
 			index_name=self._search_idx_name,
 			query_type=AzureAISearchQueryType.VECTOR_SEMANTIC_HYBRID,
 			top_k=3,
 		)
-
-	def run(self) -> str:
-		"""Run the Canadian ER triage assessment."""
-
-		existing_agents = list(self._client.agents.list_agents())
+		
+	def initialize_triage_agent(self, existing_agents: list) -> None:
+		"""Initialize The triage agent"""
 		logger.info("Found %d existing agents: %s", len(existing_agents), [agent.name for agent in existing_agents])
 		self._triage_agent = next(
 			agent for agent in existing_agents if agent.name == self._triage_agent_name
@@ -143,8 +142,8 @@ class Main:
 			)
 			logger.debug("Canadian ER Triage Agent created with ID %s and name %s", self._triage_agent.id, self._triage_agent.name)
 
-		search_tool = self.get_search_tool()
-
+	def initialize_patient_history_agent(self, existing_agents: list) -> None:
+		"""Initialize The Patient History agent"""
 		self._patient_history_agent = next(
 			agent for agent in existing_agents if agent.name == self._patient_history_agent_name
 		)
@@ -157,10 +156,21 @@ class Main:
 				name=self._patient_history_agent_name,
 				instructions=self._patient_history_instructions,
 				description="Agent to retrieve patient Immunization and DiagnosticReport history using AI search tool",
-				tools=search_tool.definitions if search_tool else None,
-				tool_resources=search_tool.resources if search_tool else None,
+				tools=self._search_tool.definitions if self._search_tool else None,
+				tool_resources=self._search_tool.resources if self._search_tool else None,
 			)
 			logger.debug("Canadian ER Patient History Agent created with ID %s and name %s", self._patient_history_agent.id, self._patient_history_agent.name)
+
+	def run(self) -> str:
+		"""Run the Canadian ER triage assessment."""
+
+		existing_agents = list(self._client.agents.list_agents())
+		
+		self.initialize_triage_agent(existing_agents)
+
+		self.initialize_search_tool()
+
+		self.initialize_patient_history_agent(existing_agents)
 
 		patient_history_agent_content: str = (
             "I need you to search for and extract Immunization records and DiagnosticReport information for Aaron697 Stanton715 (DOB: 1981-11-06). "
