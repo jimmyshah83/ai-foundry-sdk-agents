@@ -3,6 +3,8 @@ Canadian Emergency Room Triage Agent using the Canadian Triage and Acuity Scale 
 """
 import os
 import logging
+from importlib import resources
+from pathlib import Path
 import dotenv
 from azure.ai.projects import AIProjectClient
 from azure.identity import DefaultAzureCredential
@@ -33,22 +35,16 @@ class Main:
 	_patient_history_agent_name: str = "CanadianERPatientHistoryAgent"
 	_patient_history_agent: Agent
 	_search_idx_name: str = "idx-patient-data"
-	_triage_instructions = """You are a Canadian Emergency Room triage nurse following the Canadian Triage and Acuity Scale (CTAS).
-	                
-	                Assess patients using the 5-level CTAS system:
-	                - Level 1 (Resuscitation): Life-threatening, immediate intervention required
-	                - Level 2 (Emergent): Potential threat to life/limb, within 15 minutes
-	                - Level 3 (Urgent): Potentially serious, within 30 minutes
-	                - Level 4 (Less Urgent): Conditions related to patient age, distress, potential complications, within 60 minutes
-	                - Level 5 (Non-urgent): Non-urgent conditions, within 120 minutes
 
-	                For each patient, provide a list response:
-	                1. CTAS level (1-5) with rationale
-	                2. Recommended immediate actions
-	                3. Estimated wait time based on current ER capacity
-	                4. Any red flags requiring immediate attention
-	                
-	                Always prioritize patient safety and follow Canadian healthcare protocols."""
+	@property
+	def _triage_instructions(self) -> str:
+		"""Load triage instructions from config file."""
+		try:
+			with resources.files('foundry_agents.config').joinpath('triage_instructions.txt').open('r') as f:
+				return f.read()
+		except FileNotFoundError:
+			config_file = Path(__file__).parent / 'config' / 'triage_instructions.txt'
+			return config_file.read_text()
 
 	_patient_history_instructions = """You are a medical records assistant with access to an AI search tool for patient medical records.
 
@@ -112,7 +108,7 @@ class Main:
 			if msg.text_messages:
 				last_text = msg.text_messages[-1]
 				text = last_text.text.value.replace("\u3010", "[").replace("\u3011", "]")
-				logger.info("Received patient triage %s", text)
+				logger.info("%s", text)
 
 	def initialize_search_tool(self) -> AzureAISearchTool:
 		"""Get the Azure AI search tool for querying patient records."""
@@ -128,10 +124,10 @@ class Main:
 		"""Initialize The triage agent"""
 		logger.info("Found %d existing agents: %s", len(existing_agents), [agent.name for agent in existing_agents])
 		self._triage_agent = next(
-			agent for agent in existing_agents if agent.name == self._triage_agent_name
+			(agent for agent in existing_agents if agent.name == self._triage_agent_name), None
 		)
 		if self._triage_agent:
-			logger.info("Found existing agent with name %s and ID %s", self._triage_agent.name, self._triage_agent.id)
+			logger.info("Found existing triage agent with name %s and ID %s", self._triage_agent.name, self._triage_agent.id)
 		else:
 			logger.info("Creating new agent with name %s", self._triage_agent_name)
 			self._triage_agent = self._client.agents.create_agent(
@@ -145,10 +141,10 @@ class Main:
 	def initialize_patient_history_agent(self, existing_agents: list) -> None:
 		"""Initialize The Patient History agent"""
 		self._patient_history_agent = next(
-			agent for agent in existing_agents if agent.name == self._patient_history_agent_name
+			(agent for agent in existing_agents if agent.name == self._patient_history_agent_name), None
 		)
-		if (self._patient_history_agent):
-			logger.info("Found existing agent with name %s and ID %s", self._patient_history_agent.name, self._patient_history_agent.id)
+		if self._patient_history_agent:
+			logger.info("Found existing patient history agent with name %s and ID %s", self._patient_history_agent.name, self._patient_history_agent.id)
 		else:
 			logger.info("Creating new agent with name %s", self._patient_history_agent_name)
 			self._patient_history_agent = self._client.agents.create_agent(
