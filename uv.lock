@@ -876,7 +876,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "azure-ai-evaluation" },
+    { name = "azure-ai-evaluation", specifier = "==1.11.0" },
     { name = "azure-ai-projects" },
     { name = "azure-identity" },
     { name = "dotenv" },

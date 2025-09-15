@@ -27,7 +27,7 @@ dependencies = [
   "dotenv",
   "azure-identity",
   "azure-ai-projects",
-  "azure-ai-evaluation",
+  "azure-ai-evaluation>=1.11.0",
   "promptflow-azure",
   "wikipedia",
   "openai"
