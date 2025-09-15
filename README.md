@@ -2,6 +2,33 @@
 
 To run foundry-agents: `uv run foundry-agents`
 
+## Prerequisites
+
+### Pre-release Dependencies
+
+This project uses **pre-release versions** of Azure AI SDK packages to access the latest evaluation features. The following dependencies require pre-release installation:
+
+- `azure-ai-projects>=1.1.0b4` (pre-release)
+- `azure-ai-agents>=1.2.0b4` (automatically installed as dependency)
+
+#### Installation
+
+When installing dependencies, you **must** use the `--prerelease=allow` flag:
+
+```bash
+# Install all dependencies including pre-releases
+uv sync --prerelease=allow
+
+# Or add new pre-release packages
+uv add --prerelease=allow azure-ai-projects>=1.1.0b4
+```
+
+#### Why Pre-release?
+
+The stable versions of `azure-ai-projects` don't include the evaluation classes (`Evaluation`, `InputDataset`, `EvaluatorConfiguration`) required by the cloud evaluation functionality in `cloud_eval.py`. These classes are only available in the beta versions (1.1.0b4+).
+
+**Note:** Pre-release versions may have breaking changes or bugs. Use with caution in production environments.
+
 ## Dataset Information
 
 Dataset used (Sample of Canadian FHIR Data: [https://synthea.mitre.org/downloads](https://synthea.mitre.org/downloads))
@@ -101,3 +128,24 @@ Build ER triage systems that:
 - ✅ Immunization status for infectious disease protocols
 
 This synthetic dataset provides realistic examples of how comprehensive medical histories can significantly improve ER triage accuracy and patient safety through essential clinical context.
+
+## Troubleshooting
+
+### Import Errors
+
+If you encounter import errors like `No name 'Evaluation' in module 'azure.ai.projects.models'`, ensure you have:
+
+1. Installed the pre-release version: `uv sync --prerelease=allow`
+2. Verified the installed version: `uv pip show azure-ai-projects` (should be 1.1.0b4 or higher)
+3. Restarted your IDE/language server to pick up the new package versions
+
+### Environment Variables
+
+Make sure to set up your Azure credentials and endpoints in a `.env` file:
+
+```bash
+AZURE_AI_PROJECTS_ENDPOINT=your_endpoint_here
+AZURE_DEPLOYMENT_NAME=your_deployment_name
+AZURE_ENDPOINT=your_azure_endpoint
+AZURE_API_KEY=your_api_key
+```

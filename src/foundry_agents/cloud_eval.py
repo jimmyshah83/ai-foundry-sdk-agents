@@ -37,13 +37,14 @@ class CloudEvaluation:
 
     def run_evaluation(self) -> None:
         """Run the evaluation for the Canadian ER triage assessment."""
-        data_id = self._client.datasets.get("Canadian_ER_Triage_Assessment", "1.0").id
-        if not data_id:
-            data_id = self._client.datasets.upload_file(
+        dataset = self._client.datasets.get("Canadian_ER_Triage_Assessment", "1.0")
+        if dataset is None:
+            dataset = self._client.datasets.upload_file(
                 name="Canadian_ER_Triage_Assessment",
                 version="1.0",
                 file_path=str(Path(__file__).parent / "config" / "evaluation_data.jsonl"),
             )
+        data_id = dataset.id
         evaluators = {
             "relevance": EvaluatorConfiguration(
                 id=EvaluatorIds.RELEVANCE.value,

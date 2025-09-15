@@ -26,15 +26,17 @@ classifiers = [
 dependencies = [
   "python-dotenv",
   "azure-identity",
-  "azure-ai-projects",
+  "azure-ai-projects>=1.1.0b4",
   "azure-ai-evaluation>=1.11.0",
   "promptflow-azure",
   "wikipedia",
-  "openai"
+  "openai",
 ]
 
 [project.scripts]
 foundry-agents = "foundry_agents.main:cli"
+could-evaluation = "foundry_agents.cloud_eval:main"
+red-teaming = "foundry_agents.red_teaming:main"
 
 [project.optional-dependencies]
 dev = [
