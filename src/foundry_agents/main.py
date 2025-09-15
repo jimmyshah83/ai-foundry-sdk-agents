@@ -7,7 +7,7 @@ import logging
 from importlib import resources
 from pathlib import Path
 import json
-import dotenv
+from dotenv import load_dotenv
 from azure.ai.projects import AIProjectClient
 from azure.identity import DefaultAzureCredential
 from azure.ai.projects.models import ConnectionType
