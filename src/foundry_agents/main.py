@@ -111,7 +111,7 @@ class Main:
 				text = last_text.text.value.replace("\u3010", "[").replace("\u3011", "]")
 				logger.info("%s", text)
 
-	def initialize_search_tool(self) -> AzureAISearchTool:
+	def initialize_search_tool(self) -> None:
 		"""Get the Azure AI search tool for querying patient records."""
 		search_connection_id = self._client.connections.get_default(ConnectionType.AZURE_AI_SEARCH).id
 		self._search_tool = AzureAISearchTool(
@@ -186,7 +186,7 @@ class Main:
 			)
 			logger.debug("Canadian ER Conversation Agent created with ID %s and name %s", self._conversation_agent.id, self._conversation_agent.name)
 
-	def run(self) -> str:
+	def run(self) -> None:
 		"""Run the Canadian ER triage assessment."""
 
 		existing_agents = list(self._client.agents.list_agents())
