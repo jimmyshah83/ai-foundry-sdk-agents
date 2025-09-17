@@ -162,7 +162,6 @@ class Main:
             evaluators = {
                 "IntentResolutionEvaluator": IntentResolutionEvaluator(model_config=model_config),
                 "TaskAdherenceEvaluator": TaskAdherenceEvaluator(model_config=model_config),
-                "ToolCallAccuracyEvaluator": ToolCallAccuracyEvaluator(model_config=model_config),
             }
 
             # Run evaluations
