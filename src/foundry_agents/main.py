@@ -43,9 +43,9 @@ class Main:
     _triage_agent: Agent
     _patient_history_agent: Agent
     _search_tool: AzureAISearchTool
-    _conversation_agent_name: str = "CanadianERConversationAgent"
-    _triage_agent_name: str = "CanadianERTriageAgent"
-    _patient_history_agent_name: str = "CanadianERPatientHistoryAgent"
+    _conversation_agent_name: str = "ER_Assistant"
+    _triage_agent_name: str = "Triage_Specialist"
+    _patient_history_agent_name: str = "Medical_Records_Specialist"
     _search_idx_name: str = "idx-patient-data"
 
     @property
@@ -225,7 +225,7 @@ class Main:
             )
 
     def initialize_patient_history_agent(self, existing_agents: list) -> None:
-        """Initialize The Patient History agent"""
+        """Initialize The Patient History agent with AI search tools"""
         self._patient_history_agent = next(
             (agent for agent in existing_agents if agent.name == self._patient_history_agent_name),
             None,
@@ -236,6 +236,20 @@ class Main:
                 self._patient_history_agent.name,
                 self._patient_history_agent.id,
             )
+            # Ensure existing agent has AI search tools attached for consistent tool usage
+            if self._search_tool:
+                logger.info(
+                    "Updating existing patient history agent with AI search tools"
+                )
+                self._patient_history_agent = self._client.agents.update_agent(
+                    agent_id=self._patient_history_agent.id,
+                    tools=self._search_tool.definitions,
+                    tool_resources=self._search_tool.resources,
+                )
+                logger.debug(
+                    "Successfully updated patient history agent tools for agent ID %s",
+                    self._patient_history_agent.id,
+                )
         else:
             logger.info("Creating new agent with name %s", self._patient_history_agent_name)
             self._patient_history_agent = self._client.agents.create_agent(
