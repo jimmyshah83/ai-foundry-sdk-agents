@@ -43,14 +43,26 @@ class RedTeamAgent:
         logger.info("Initialized AIProjectClient %s", self._client)
 
     def evaluate(self) -> None:
-        """Evaluate the model using the provided test data."""
+        """Evaluate the model using complex attack strategies and comprehensive risk categories."""
         target_config = AzureOpenAIModelConfiguration(
             model_deployment_name=model_deployment_name
         )
 
+        # Enhanced red teaming: multiple attack strategies for robustness testing
         red_team = RedTeam(
-            attack_strategies=[AttackStrategy.BASE64],
-            risk_categories=[RiskCategory.HATE_UNFAIRNESS, RiskCategory.VIOLENCE],
+            attack_strategies=[
+                AttackStrategy.BASE64,
+                AttackStrategy.URL,
+                AttackStrategy.JAILBREAK,
+                AttackStrategy.LEETSPEAK,
+                AttackStrategy.DIFFICULT,
+            ],
+            risk_categories=[
+                RiskCategory.HATE_UNFAIRNESS,
+                RiskCategory.VIOLENCE,
+                RiskCategory.SELF_HARM,
+                RiskCategory.SEXUAL,
+            ],
             display_name="red-team-cloud-run",
             target=target_config,
         )
@@ -62,7 +74,7 @@ class RedTeamAgent:
             headers=headers
         )
         
-        logger.info("Created red team agent: %s", red_team_response.name)
+        logger.info("Created red team agent with enhanced multi-vector testing: %s", red_team_response.name)
 
 def main() -> None:
     """Main entry point for the red team evaluation."""
