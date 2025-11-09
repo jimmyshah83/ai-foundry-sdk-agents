@@ -35,7 +35,7 @@ dependencies = [
 
 [project.scripts]
 foundry-agents = "foundry_agents.main:cli"
-could-evaluation = "foundry_agents.cloud_eval:main"
+cloud-evaluation = "foundry_agents.cloud_eval:main"
 red-teaming = "foundry_agents.red_teaming:main"
 
 [project.optional-dependencies]
